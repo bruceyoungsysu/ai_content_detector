@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "AI Content Detector",
+  "description": "Filters AI-generated content on YouTube",
+  "version": "0.1.0",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["layer1.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AI Content Detector"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["page-bridge.js"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ]
+}

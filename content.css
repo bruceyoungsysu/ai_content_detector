@@ -1,0 +1,56 @@
+/* ============================================================
+   AI Content Detector — YouTube content styles
+   Badges are rendered via ::before pseudo-elements so we never
+   need to inject DOM nodes into YouTube's shadow-DOM tree.
+   ============================================================ */
+
+/* Create a positioning context on the card (safe for grid items) */
+ytd-rich-item-renderer[data-aicd],
+ytd-video-renderer[data-aicd],
+ytd-compact-video-renderer[data-aicd] {
+  position: relative !important;
+}
+
+/* Base badge styles shared by both states */
+ytd-rich-item-renderer[data-aicd]::before,
+ytd-video-renderer[data-aicd]::before,
+ytd-compact-video-renderer[data-aicd]::before {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 9999;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #fff;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* "Not AI" — green */
+ytd-rich-item-renderer[data-aicd="safe"]::before,
+ytd-video-renderer[data-aicd="safe"]::before,
+ytd-compact-video-renderer[data-aicd="safe"]::before {
+  content: "Not AI";
+  background: #2e7d32;
+}
+
+/* "Possibly AI" — amber */
+ytd-rich-item-renderer[data-aicd="possible"]::before,
+ytd-video-renderer[data-aicd="possible"]::before,
+ytd-compact-video-renderer[data-aicd="possible"]::before {
+  content: "Possibly AI";
+  background: #e65100;
+}
+
+/* "AI Detected" — red */
+ytd-rich-item-renderer[data-aicd="ai"]::before,
+ytd-video-renderer[data-aicd="ai"]::before,
+ytd-compact-video-renderer[data-aicd="ai"]::before {
+  content: "AI Detected";
+  background: #c62828;
+}
