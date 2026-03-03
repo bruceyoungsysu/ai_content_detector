@@ -1,5 +1,7 @@
 # AI Content Detector
 
+[![License: PolyForm Noncommercial 1.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0-blue)](LICENSE)
+
 A Chrome extension (Manifest V3) that labels YouTube video cards with a badge
 indicating whether the content is likely AI-generated.
 
