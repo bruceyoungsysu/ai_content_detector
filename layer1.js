@@ -103,9 +103,7 @@ async function initLayer1() {
     if (event.source !== window) return;
     if (event.data?.type !== "AICD_YT_CONTINUATION") return;
     if (!_metaCache) return;
-    const before = _metaCache.size;
     walkForVideos(event.data.payload, _metaCache);
-    }
   });
 
 }

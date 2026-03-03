@@ -1,5 +1,5 @@
 // Content script — orchestrates detection and badge rendering on YouTube.
-// layer1.js is loaded before this file (see manifest.json).
+// layer1.js and layer2.js are loaded before this file (see manifest.json).
 
 let isEnabled = true;
 
@@ -21,14 +21,27 @@ function getBadgeState(score) {
 // Filter
 // ---------------------------------------------------------------------------
 
-function processCard(el) {
+async function processCard(el) {
   if (!isEnabled) {
     el.removeAttribute("data-aicd");
     return;
   }
 
-  const score = analyzeLayer1(el); // defined in layer1.js
-  el.setAttribute("data-aicd", getBadgeState(score));
+  const s1 = analyzeLayer1(el);                       // defined in layer1.js
+  el.setAttribute("data-aicd", getBadgeState(s1));    // immediate L1 badge
+
+  const videoId = getVideoId(el);                     // defined in layer1.js
+  console.log("[AICD] processCard videoId:", videoId, el.tagName);
+  if (!videoId) return;
+
+  analyzeLayer2(videoId)                              // defined in layer2.js
+    .then(s2 => {
+      if (!isEnabled || !el.isConnected) return;
+      const combined = 1 - (1 - s1) * (1 - s2);      // Bayesian combination
+      el.setAttribute("data-aicd", getBadgeState(combined));
+    })
+    .catch(() => {});                                  // L2 failures are non-fatal
+  // No await — applyFilter() stays fast; layer2 resolves independently
 }
 
 function applyFilter() {

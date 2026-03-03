@@ -1,0 +1,12 @@
+# Downloaded by setup_model.sh — not committed, regenerate with ./setup_model.sh
+ort.min.js
+ort-wasm.wasm
+ort-wasm-simd.wasm
+
+# Model files — downloaded/exported by setup scripts
+mobilenet/
+ai_detector/
+efficientnet_b0_best.pth
+
+# macOS
+.DS_Store
