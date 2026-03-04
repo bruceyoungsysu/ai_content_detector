@@ -53,6 +53,7 @@
         background: #16213e;
         border-radius: 8px;
         padding: 12px 14px;
+        margin-bottom: 8px;
       }
 
       .row label {
@@ -103,8 +104,58 @@
         transform: translateX(18px);
       }
 
+      /* Training stats */
+      .stats {
+        background: #16213e;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 8px;
+      }
+
+      .stats-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+
+      .stats-counts {
+        font-size: 13px;
+        color: #ccc;
+        margin-bottom: 4px;
+      }
+
+      .stats-counts .ai-count  { color: #ef5350; }
+      .stats-counts .real-count { color: #66bb6a; }
+
+      .stats-status {
+        font-size: 11px;
+        color: #888;
+      }
+
+      .stats-status.active { color: #66bb6a; }
+
+      /* Export button */
+      .btn-export {
+        width: 100%;
+        padding: 9px;
+        background: #0f3460;
+        color: #90caf9;
+        border: 1px solid #1a4a8a;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+        margin-bottom: 8px;
+      }
+
+      .btn-export:hover { background: #1a4a8a; }
+      .btn-export:disabled { opacity: 0.4; cursor: default; }
+
       footer {
-        margin-top: 14px;
         font-size: 10px;
         color: #555;
         text-align: center;
@@ -124,6 +175,14 @@
         <span class="slider"></span>
       </label>
     </div>
+
+    <div class="stats">
+      <div class="stats-title">Training data</div>
+      <div class="stats-counts" id="statsCounts">Loading…</div>
+      <div class="stats-status" id="statsStatus"></div>
+    </div>
+
+    <button class="btn-export" id="btnExport">Export training data</button>
 
     <footer>Active on YouTube</footer>
 

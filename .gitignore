@@ -8,5 +8,10 @@ mobilenet/
 ai_detector/
 efficientnet_b0_best.pth
 
+# Training seed data — private per developer, never committed
+# Export via the popup's "Export" button, save as data/private_seed.json locally
+# Future: data/public_seed.json will be committed (community-curated, anonymised)
+data/private_seed.json
+
 # macOS
 .DS_Store
