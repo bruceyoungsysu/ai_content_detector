@@ -30,6 +30,8 @@ async function processCard(el) {
   const s1 = analyzeLayer1(el);                       // defined in layer1.js
   el.setAttribute("data-aicd", getBadgeState(s1));    // immediate L1 badge
 
+  attachFeedbackWidget(el);                           // defined in feedback-ui.js
+
   const videoId = getVideoId(el);                     // defined in layer1.js
   console.log("[AICD] processCard videoId:", videoId, el.tagName);
   if (!videoId) return;

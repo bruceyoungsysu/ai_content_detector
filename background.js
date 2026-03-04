@@ -105,6 +105,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "STORE_FEEDBACK") {
+    const { entry } = message;
+    if (entry?.videoId && entry?.userLabel) {
+      openDb()
+        .then((db) => storeFeedback(db, entry))
+        .catch(() => {});
+    }
+    return false;
+  }
+
   if (message.type === "GET_FEEDBACK_COUNTS") {
     openDb()
       .then((db) => getFeedbackCount(db))

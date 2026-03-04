@@ -54,3 +54,54 @@ ytd-compact-video-renderer[data-aicd="ai"]::before {
   content: "AI Detected";
   background: #c62828;
 }
+
+/* ── Feedback widget ─────────────────────────────────────────────────────── */
+
+.aicd-feedback {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 9998;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+/* Show on card hover */
+ytd-rich-item-renderer:hover .aicd-feedback,
+ytd-video-renderer:hover .aicd-feedback,
+ytd-compact-video-renderer:hover .aicd-feedback {
+  display: flex;
+}
+
+/* Always show when labeled */
+.aicd-feedback[data-labeled="ai"],
+.aicd-feedback[data-labeled="real"] {
+  display: flex;
+}
+
+.aicd-fb-btn {
+  padding: 3px 8px;
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.15s, box-shadow 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.aicd-fb-btn:hover { opacity: 1; }
+
+.aicd-fb-ai   { background: #c62828; color: #fff; }
+.aicd-fb-real { background: #2e7d32; color: #fff; }
+
+/* Active label — highlight active button, fade the other */
+.aicd-feedback[data-labeled="ai"]   .aicd-fb-ai   { opacity: 1; box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0,0,0,0.5); }
+.aicd-feedback[data-labeled="ai"]   .aicd-fb-real { opacity: 0.35; }
+.aicd-feedback[data-labeled="real"] .aicd-fb-real { opacity: 1; box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0,0,0,0.5); }
+.aicd-feedback[data-labeled="real"] .aicd-fb-ai   { opacity: 0.35; }

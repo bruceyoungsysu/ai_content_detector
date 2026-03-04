@@ -149,25 +149,40 @@ function buildLockupMeta(renderer) {
   const lmvm  = renderer.metadata?.lockupMetadataViewModel;
   const title = lmvm?.title?.content ?? "";
 
-  // Channel name lives in the first non-empty metadataRow part
+  // Channel name + channelId live in the first non-empty metadataRow part.
   const rows = lmvm?.metadata?.contentMetadataViewModel?.metadataRows ?? [];
   let channel = "";
+  let channelId = "";
   outer: for (const row of rows) {
     for (const part of (row.metadataParts ?? [])) {
       const text = part?.text?.content ?? part?.text?.simpleText ?? "";
-      if (text) { channel = text; break outer; }
+      if (text) {
+        channel = text;
+        // Try to find the browseId in commandRuns
+        const runs = part?.text?.commandRuns ?? [];
+        for (const run of runs) {
+          const id = run?.onTap?.innertubeCommand?.browseEndpoint?.browseId;
+          if (id) { channelId = id; break; }
+        }
+        break outer;
+      }
     }
   }
 
-  return { title, description: "", channel, badges: [], tags: [] };
+  return { title, description: "", channel, channelId, badges: [], tags: [] };
 }
 
 /** Legacy videoRenderer */
 function buildMeta(renderer) {
+  const channelId =
+    renderer.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId ??
+    renderer.longBylineText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId ??
+    "";
   return {
     title:       extractText(renderer.title)                                ?? "",
     description: extractText(renderer.descriptionSnippet)                   ?? "",
     channel:     extractText(renderer.ownerText ?? renderer.longBylineText) ?? "",
+    channelId,
     badges:      extractBadgeLabels(renderer),
     tags:        Array.isArray(renderer.tags) ? renderer.tags : [],
   };
@@ -228,6 +243,33 @@ function getCardTitle(cardEl) {
   if (thumbLabel) return thumbLabel;
 
   return "";
+}
+
+function getChannelId(cardEl) {
+  const videoId = getVideoId(cardEl);
+  if (videoId) {
+    const cached = _metaCache?.get(videoId);
+    if (cached?.channelId) return cached.channelId;
+  }
+  // DOM fallback: find a /channel/UC... link inside the card.
+  const link =
+    shadowQuery(cardEl, "a.yt-simple-endpoint[href*='/channel/']") ??
+    shadowQuery(cardEl, "#channel-name a") ??
+    shadowQuery(cardEl, "yt-formatted-string.ytd-channel-name a");
+  if (link?.href) {
+    const m = link.href.match(/\/channel\/(UC[\w-]+)/);
+    if (m) return m[1];
+  }
+  return "";
+}
+
+function getChannelName(cardEl) {
+  const videoId = getVideoId(cardEl);
+  if (videoId) {
+    const cached = _metaCache?.get(videoId);
+    if (cached?.channel) return cached.channel;
+  }
+  return shadowQuery(cardEl, "#channel-name")?.textContent?.trim() ?? "";
 }
 
 // ---------------------------------------------------------------------------
