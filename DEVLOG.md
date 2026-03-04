@@ -147,7 +147,7 @@ When enough labeled data exists (cross-user, opt-in):
 | # | Phase | Status | Key Deliverables |
 |---|---|---|---|
 | 1 | Remove broken model | `complete` | Delete EfficientNet-B0, ONNX Runtime; L2 returns neutral |
-| 2 | IndexedDB layer | `pending` | `db.js` with feedback + feat_cache stores |
+| 2 | IndexedDB layer | `complete` | `db.js` with feedback + feat_cache stores |
 | 3 | Feedback UI | `pending` | `feedback-ui.js`, CSS buttons, `STORE_FEEDBACK` handler |
 | 4 | Channel reputation | `pending` | `layer3.js`, Beta-smoothed rep, `CHANNEL_REP_UPDATED` broadcast |
 | 5 | Image feature extraction | `pending` | `features.js`, 30-feature vector, offscreen canvas pipeline |
@@ -580,5 +580,20 @@ The extension now runs on L1 only. L2 contributes a neutral score (0) which
 has no effect on the Bayesian combination formula — correct cold-start behavior.
 
 Next session: Phase 2 (IndexedDB layer — `db.js`).
+
+**Phase 2 complete: IndexedDB layer**
+
+Created `db.js` — the persistent storage foundation for all subsequent phases.
+Loaded in `offscreen.html` before `offscreen.js` so it is available in the
+offscreen document context where Canvas and IDB are both accessible.
+
+Two stores in database `"ai_cd_v1"`:
+- `feedback` — user-labeled videos, indexed by videoId / channelId / userLabel / timestamp
+- `feat_cache` — extracted image feature vectors keyed by videoId
+
+All functions take an open `IDBDatabase` as first argument (caller opens once,
+reuses across calls) rather than reopening on every call.
+
+Next session: Phase 3 (Feedback UI — `feedback-ui.js`, CSS buttons, `STORE_FEEDBACK`).
 
 *Add new entries at the bottom with today's date when starting a session.*
