@@ -67,18 +67,19 @@ ytd-reel-item-renderer[data-aicd="ai"]::before {
   top: 8px;
   right: 8px;
   z-index: 9998;
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: 4px;
   pointer-events: auto;
+  opacity: 0.35;
+  transition: opacity 0.2s;
 }
 
-/* Show via JS-managed class (mouseenter/mouseleave with 300ms grace period) */
-.aicd-feedback.aicd-visible,
-/* Always show when labeled */
+/* Full opacity on hover or when labeled */
+.aicd-feedback:hover,
 .aicd-feedback[data-labeled="ai"],
 .aicd-feedback[data-labeled="real"] {
-  display: flex;
+  opacity: 1;
 }
 
 .aicd-fb-btn {

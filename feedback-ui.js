@@ -40,17 +40,6 @@ function attachFeedbackWidget(cardEl) {
   const prev = _labeled.get(videoId);
   if (prev) widget.dataset.labeled = prev;
 
-  // JS-managed hover — CSS :hover breaks when YouTube's video preview overlay
-  // intercepts pointer events. A 300ms grace period lets the user move the mouse
-  // from the card surface to the buttons without the widget disappearing.
-  let _hideTimer = null;
-  const _show = () => { clearTimeout(_hideTimer); widget.classList.add("aicd-visible"); };
-  const _scheduleHide = () => { _hideTimer = setTimeout(() => widget.classList.remove("aicd-visible"), 300); };
-  cardEl.addEventListener("mouseenter", _show);
-  cardEl.addEventListener("mouseleave", _scheduleHide);
-  widget.addEventListener("mouseenter", _show);    // cancel hide when mouse reaches buttons
-  widget.addEventListener("mouseleave", _scheduleHide);
-
   btnAi.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
