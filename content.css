@@ -7,14 +7,16 @@
 /* Create a positioning context on the card (safe for grid items) */
 ytd-rich-item-renderer[data-aicd],
 ytd-video-renderer[data-aicd],
-ytd-compact-video-renderer[data-aicd] {
+ytd-compact-video-renderer[data-aicd],
+ytd-reel-item-renderer[data-aicd] {
   position: relative !important;
 }
 
-/* Base badge styles shared by both states */
+/* Base badge styles shared by all states */
 ytd-rich-item-renderer[data-aicd]::before,
 ytd-video-renderer[data-aicd]::before,
-ytd-compact-video-renderer[data-aicd]::before {
+ytd-compact-video-renderer[data-aicd]::before,
+ytd-reel-item-renderer[data-aicd]::before {
   position: absolute;
   top: 8px;
   left: 8px;
@@ -34,7 +36,8 @@ ytd-compact-video-renderer[data-aicd]::before {
 /* "Not AI" — green */
 ytd-rich-item-renderer[data-aicd="safe"]::before,
 ytd-video-renderer[data-aicd="safe"]::before,
-ytd-compact-video-renderer[data-aicd="safe"]::before {
+ytd-compact-video-renderer[data-aicd="safe"]::before,
+ytd-reel-item-renderer[data-aicd="safe"]::before {
   content: "Not AI";
   background: #2e7d32;
 }
@@ -42,7 +45,8 @@ ytd-compact-video-renderer[data-aicd="safe"]::before {
 /* "Possibly AI" — amber */
 ytd-rich-item-renderer[data-aicd="possible"]::before,
 ytd-video-renderer[data-aicd="possible"]::before,
-ytd-compact-video-renderer[data-aicd="possible"]::before {
+ytd-compact-video-renderer[data-aicd="possible"]::before,
+ytd-reel-item-renderer[data-aicd="possible"]::before {
   content: "Possibly AI";
   background: #e65100;
 }
@@ -50,7 +54,8 @@ ytd-compact-video-renderer[data-aicd="possible"]::before {
 /* "AI Detected" — red */
 ytd-rich-item-renderer[data-aicd="ai"]::before,
 ytd-video-renderer[data-aicd="ai"]::before,
-ytd-compact-video-renderer[data-aicd="ai"]::before {
+ytd-compact-video-renderer[data-aicd="ai"]::before,
+ytd-reel-item-renderer[data-aicd="ai"]::before {
   content: "AI Detected";
   background: #c62828;
 }
@@ -68,13 +73,8 @@ ytd-compact-video-renderer[data-aicd="ai"]::before {
   pointer-events: auto;
 }
 
-/* Show on card hover */
-ytd-rich-item-renderer:hover .aicd-feedback,
-ytd-video-renderer:hover .aicd-feedback,
-ytd-compact-video-renderer:hover .aicd-feedback {
-  display: flex;
-}
-
+/* Show via JS-managed class (mouseenter/mouseleave with 300ms grace period) */
+.aicd-feedback.aicd-visible,
 /* Always show when labeled */
 .aicd-feedback[data-labeled="ai"],
 .aicd-feedback[data-labeled="real"] {

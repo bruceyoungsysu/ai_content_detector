@@ -225,10 +225,17 @@ function shadowQuery(root, selector) {
 function getVideoId(cardEl) {
   const link =
     shadowQuery(cardEl, "a#thumbnail") ??
-    shadowQuery(cardEl, "a[href*='/watch']");
+    shadowQuery(cardEl, "a[href*='/watch']") ??
+    shadowQuery(cardEl, "a[href*='/shorts/']");
   if (!link?.href) return null;
-  try { return new URL(link.href).searchParams.get("v") ?? null; }
-  catch { return null; }
+  try {
+    const url = new URL(link.href);
+    const v = url.searchParams.get("v");
+    if (v) return v;
+    // Shorts: /shorts/VIDEO_ID
+    const m = url.pathname.match(/^\/shorts\/([\w-]+)/);
+    return m?.[1] ?? null;
+  } catch { return null; }
 }
 
 function getCardTitle(cardEl) {
