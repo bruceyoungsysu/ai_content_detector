@@ -157,6 +157,322 @@ When enough labeled data exists (cross-user, opt-in):
 
 ---
 
+### Phase 1 — Remove Broken Model `complete`
+
+**Goal:** Strip EfficientNet-B0 and ONNX Runtime. L2 returns 0 (neutral). Extension stays
+functional via L1 only. No signal is better than a systematically wrong signal.
+
+**Files changed:**
+- `offscreen.js` — gutted to a 20-line stub returning `score: 0`
+- `offscreen.html` — removed `ort.min.js` script tag
+- `manifest.json` — removed `wasm-unsafe-eval` from CSP
+- `background.js` — removed debug logits logging
+- Deleted `export_model.py`, `setup_model.sh`
+
+**Done when:** Extension loads without errors; L2 score is always 0; L1 badges still appear.
+
+---
+
+### Phase 2 — IndexedDB Layer `pending`
+
+**Goal:** Persistent local storage that all other phases depend on. Stores user feedback
+and a cache of extracted image feature vectors.
+
+**Files to create:**
+- `db.js` — loaded in `offscreen.html` before `offscreen.js`
+
+**Database:** `"ai_cd_v1"`, version 1
+
+**Stores:**
+
+```
+feedback   (keyPath: "id", autoIncrement)
+  indexes: videoId, channelId, userLabel, timestamp
+  fields:  id, videoId, channelId, channelName, title,
+           thumbnailUrl, userLabel ("ai"|"real"), timestamp
+
+feat_cache  (keyPath: "videoId")
+  fields:  videoId, features (number[]), extractedAt
+```
+
+**API exported by db.js:**
+```
+openDb()                           → Promise<IDBDatabase>
+storeFeedback(entry)               → Promise<number>   (inserted id)
+getAllFeedback()                    → Promise<FeedbackEntry[]>
+getFeedbackCount()                 → Promise<{ai, real}>
+cacheFeatures(videoId, features)   → Promise<void>
+getCachedFeatures(videoId)         → Promise<number[] | null>
+```
+
+**Note:** Service workers can also open IndexedDB directly (it's a standard Worker API).
+`db.js` is loaded in the offscreen doc to handle feature caching alongside canvas ops.
+`background.js` opens its own IDB connection for feedback reads/writes during training.
+
+**Files to modify:**
+- `offscreen.html` — add `<script src="db.js"></script>` before `offscreen.js`
+
+**Done when:** Can open `chrome://extensions` → inspect offscreen document console and
+call `openDb()` without errors; `storeFeedback()` and `getAllFeedback()` round-trip correctly.
+
+---
+
+### Phase 3 — Feedback UI `pending`
+
+**Goal:** Non-intrusive [AI] / [Real] buttons on each YouTube card. Hover to reveal,
+click to label. Labeled state persists visually for the session.
+
+**Files to create:**
+- `feedback-ui.js` — content script, loaded before `content.js`
+
+**Widget HTML (injected once per card):**
+```html
+<div class="aicd-feedback" data-video-id="..." data-channel-id="...">
+  <button class="aicd-fb-btn aicd-fb-ai"   aria-label="Mark as AI-generated">AI</button>
+  <button class="aicd-fb-btn aicd-fb-real" aria-label="Mark as real">Real</button>
+</div>
+```
+
+**Widget states:**
+- `idle` — hidden, revealed on card hover
+- `labeled-ai` — AI button filled red, Real faded; widget stays visible
+- `labeled-real` — Real button filled green, AI faded; widget stays visible
+- Clicking an active button un-labels (toggle back to idle)
+
+**Message sent on click:**
+```js
+chrome.runtime.sendMessage({
+  type: "STORE_FEEDBACK",
+  entry: { videoId, channelId, channelName, title, thumbnailUrl, userLabel, timestamp }
+})
+```
+
+**Files to modify:**
+- `content.css` — add `.aicd-feedback`, `.aicd-fb-btn`, hover/active/labeled styles
+- `content.js` — call `attachFeedbackWidget(el, videoId, channelId, channelName, title)`
+  from `processCard()` after the L1 badge is set
+- `layer1.js` — extract and expose `channelId` (`browseEndpoint.browseId`) from both
+  `videoRenderer` and `lockupViewModel` metadata formats; add `getChannelId(el)` helper
+- `background.js` — add `STORE_FEEDBACK` handler → writes to IndexedDB via IDB connection
+- `manifest.json` — add `layer3.js`, `feedback-ui.js` to content_scripts (before `content.js`)
+
+**Done when:** Buttons appear on hover; clicking AI/Real stores an entry in IndexedDB
+(verify in DevTools → Application → IndexedDB → ai_cd_v1 → feedback).
+
+---
+
+### Phase 4 — Channel Reputation (L3) `pending`
+
+**Goal:** Maintain a per-channel reputation score that reflects how often a user has
+labeled that channel's videos as AI. Used as an immediate signal for unseen videos
+from the same channel.
+
+**Files to create:**
+- `layer3.js` — content script, loaded before `content.js`
+
+**Reputation formula (Beta distribution with Laplace smoothing):**
+```
+alpha = n_ai  + 1
+beta  = n_real + 1
+score = alpha / (alpha + beta)     → [0, 1], 0.5 = neutral
+```
+
+Behaviour at key counts:
+- 0 labels: 0.50 (neutral — no contribution to score)
+- 1 AI, 0 real: 0.67
+- 5 AI, 0 real: 0.86
+- 5 AI, 5 real: 0.50 (neutral — channel is mixed)
+
+**Storage:** `chrome.storage.local` key `"channel_rep"`:
+```js
+{ [channelId]: { score, n_ai, n_real, updatedAt } }
+```
+
+**API exported by layer3.js:**
+```js
+initLayer3()              // loads channel_rep from storage into memory cache
+analyzeLayer3(channelId)  // returns score in [0,1]; 0.5 if unknown or <2 labels
+```
+
+**Files to modify:**
+- `background.js` — add `updateChannelRep(channelId, label)` called from `STORE_FEEDBACK`
+  handler; broadcasts `CHANNEL_REP_UPDATED` to all YouTube tabs after each update
+- `content.js` — call `analyzeLayer3(channelId)` in `processCard()`; update combination
+  formula to three-way: `combined = 1 - (1-s1) * (1-s2) * (1-s3)`, excluding s3 when
+  `Math.abs(s3 - 0.5) < 0.1` (not enough signal)
+
+**Done when:** Labeling a video updates `channel_rep` in storage; the next video from the
+same channel scores differently from a neutral channel.
+
+---
+
+### Phase 5 — Image Feature Extraction `pending`
+
+**Goal:** Replace the neutral stub in `offscreen.js` with real thumbnail analysis.
+Extract a 30-element feature vector from each thumbnail using only the canvas API —
+no model files, no ONNX Runtime. Features are cached in IndexedDB.
+
+**Files to create:**
+- `features.js` — loaded in `offscreen.html` before `offscreen.js`
+
+**Pipeline:**
+```
+thumbnailUrl
+  → fetch (cors) → createImageBitmap
+  → OffscreenCanvas(56, 56)            (small size — fast, enough for statistics)
+  → ctx.getImageData → RGBA Uint8ClampedArray
+  → computeFeatureVector(data, 56, 56) → Float32Array[30]
+  → cache in IndexedDB feat_cache
+```
+
+**Feature groups (30 total):**
+```
+Saturation stats (5)   mean sat, std sat, hyper-sat fraction >0.7,
+                       mean lightness, std lightness
+Color histogram  (6)   R/G/B channel entropy, hue entropy,
+                       dominant-color concentration (top-2 hue buckets / 32)
+Edge density     (4)   edge pixel fraction (Sobel), mean gradient magnitude,
+                       std gradient magnitude, spatial uniformity across 4 quadrants
+Texture          (5)   local variance mean, high-freq power ratio,
+                       block artifact score, over-sharpening score,
+                       chromatic aberration proxy
+Face/text        (5)   skin-tone pixel fraction, bright region fraction (L>0.85),
+                       dark region fraction (L<0.1), center weight,
+                       near-white fraction (sat<0.1, L>0.75)
+Global           (5)   mean R, mean G, mean B, color temperature proxy (R-B),
+                       luminance variance
+```
+
+**Files to modify:**
+- `offscreen.html` — add `<script src="features.js"></script>` before `offscreen.js`
+- `offscreen.js` — replace neutral stub with:
+  1. `OFFSCREEN_ANALYZE`: fetch thumbnail → `computeFeatureVector()` → cache →
+     call `predictLR(features, model)` → return score (still 0 if model not yet trained)
+  2. `OFFSCREEN_EXTRACT_BATCH`: batch-process a list of `{videoId, thumbnailUrl}`,
+     extract features and write to `feat_cache` IDB store, reply with
+     `OFFSCREEN_EXTRACT_DONE`
+
+**Done when:** Feature vectors appear in `feat_cache` store in DevTools IndexedDB
+after viewing YouTube thumbnails.
+
+---
+
+### Phase 6 — Logistic Regression Classifier `pending`
+
+**Goal:** Train a binary classifier from user feedback on extension startup. Weights
+stored in `chrome.storage.local`. Inference runs in the offscreen document using
+features from Phase 5. L2 becomes a real signal once ≥10 examples per class exist.
+
+**Files to create:**
+- `lr.js` — imported by `background.js` via `importScripts("lr.js")`
+
+**API:**
+```js
+trainLR(samples, options)   // samples: [{features: number[], label: 0|1}]
+                            // options: {lr, epochs, l2}  (defaults: 0.1, 200, 0.01)
+                            // returns: {weights, bias, means, stds, trainedAt, nAi, nReal}
+
+predictLR(features, model)  // returns P(AI) in [0, 1]
+```
+
+**Training algorithm:** Gradient descent logistic regression with z-score feature
+normalisation and L2 regularisation. ~2ms for 100 samples, ~12ms for 1,000 samples.
+Fits comfortably within service worker startup budget.
+
+**Training trigger in background.js (`trainOnStartup()`):**
+```
+1. Read all feedback from IndexedDB
+2. Count ai / real labels — if either < 10, save lr_model: null, return
+3. Identify feedback entries without cached features
+4. If any: ensureOffscreen() → send OFFSCREEN_EXTRACT_BATCH → await OFFSCREEN_EXTRACT_DONE
+5. Build samples array from feedback + feat_cache
+6. Call trainLR(samples) → save lr_model to chrome.storage.local
+7. Broadcast LR_MODEL_UPDATED to all YouTube tabs
+```
+
+`trainOnStartup()` is called on `chrome.runtime.onInstalled` and service worker `activate`.
+
+**Files to modify:**
+- `background.js` — add `importScripts("lr.js")`, add `trainOnStartup()`, add
+  `LR_MODEL_UPDATED` broadcast, update `OFFSCREEN_RESULT` handler path
+- `offscreen.js` — `OFFSCREEN_ANALYZE` loads `lr_model` from storage and calls
+  `predictLR(features, model)`; returns 0 if model is null (cold-start)
+- `layer2.js` — no changes (message protocol unchanged)
+
+**Done when:** After labeling ≥10 AI and ≥10 Real videos, reloading the extension
+causes `[AICD LR] Trained: X AI, Y Real` to appear in the service worker console;
+subsequent thumbnails receive non-zero scores.
+
+---
+
+### Phase 7 — L1 Pattern Learning `pending`
+
+**Goal:** When a user labels a video as AI, extract meaningful n-grams from the title
+and store them as personal learned signals. These supplement the hardcoded keyword
+lists in `layer1.js` over time.
+
+**Pattern extraction (runs in background.js on each AI-labeled feedback):**
+```
+1. Lowercase and strip punctuation from title
+2. Split into words; remove stop words and short tokens (<3 chars)
+3. Extract 1-grams and 2-grams not already covered by AI_PHRASES or AI_TOOLS
+4. Add to learned_patterns set (capped at 500 to prevent storage bloat)
+5. Save to chrome.storage.local
+6. Broadcast LEARNED_PATTERNS_UPDATED to all YouTube tabs
+```
+
+Only AI-labeled videos contribute patterns. Real-labeled videos are ignored.
+
+**Weight in layer1.js:** `learnedPattern: 0.55` (between `aiPhrase: 0.70` and
+`aiSubjectVerb: 0.50`).
+
+**Files to modify:**
+- `background.js` — add `learnPatterns(title, label)` called from `STORE_FEEDBACK`
+  handler; add `GET_LEARNED_PATTERNS` message handler; broadcast `LEARNED_PATTERNS_UPDATED`
+- `layer1.js` — load learned patterns at `initLayer1()` via message to background;
+  add `hasLearnedPattern(text)` check in `analyzeLayer1()`; listen for
+  `LEARNED_PATTERNS_UPDATED` to refresh in-memory cache
+
+**Done when:** Labeling a video as AI adds its title tokens to `learned_patterns` in
+storage; a new video with a matching phrase scores higher from L1.
+
+---
+
+### Phase 8 — Popup Stats `pending`
+
+**Goal:** Show the user the value their feedback is generating. Makes the training
+loop visible and tells the user when the classifier becomes active.
+
+**Popup states:**
+
+```
+Enough data (both classes ≥ 10):
+  ✓ Classifier active
+  47 labeled videos (23 AI · 24 Real)
+  Last trained: 2 hours ago
+
+Cold start (one class < 10):
+  ◌ Classifier not yet active
+  12 labeled videos (8 AI · 4 Real)
+  Need 6 more Real to activate
+
+No data:
+  ◌ No labels yet
+  Use the [AI] / [Real] buttons on video cards to start training.
+```
+
+**Files to modify:**
+- `popup.html` — add stats panel below the existing toggle
+- `popup.js` — on open: send `GET_FEEDBACK_COUNTS` to background → display counts
+  and `lr_model` training status from `chrome.storage.local`
+- `background.js` — add `GET_FEEDBACK_COUNTS` handler → queries IndexedDB and
+  returns `{ai, real, trainedAt}` via `sendResponse`
+
+**Done when:** Opening the popup shows accurate labeled counts and correctly reflects
+whether the classifier is active or waiting for more data.
+
+---
+
 ## Decision Log
 
 ---
