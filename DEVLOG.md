@@ -594,6 +594,24 @@ Two stores in database `"ai_cd_v1"`:
 All functions take an open `IDBDatabase` as first argument (caller opens once,
 reuses across calls) rather than reopening on every call.
 
+**Phase 2 (cont): private seed file, popup stats, and export button**
+
+Added persistence across extension reinstalls via a gitignored `data/private_seed.json`:
+
+- `background.js` — `importScripts("db.js")`; `seedFromFile()` fetches
+  `data/private_seed.json` on fresh install and imports any videoIds not already in IDB
+- `manifest.json` — added `"downloads"` permission so popup can trigger file saves
+- `popup.html` / `popup.js` — training data panel shows labeled count breakdown
+  (AI vs. Real) and classifier status ("✓ Classifier active" when both ≥ 10 labels,
+  otherwise "Need X more AI/Real to activate classifier");
+  Export button downloads all IDB entries as `private_seed.json` via `chrome.downloads`
+- `.gitignore` — `data/private_seed.json` is gitignored (personal labels only);
+  `data/public_seed.json` reserved for a future community-curated seed
+- `data/.gitkeep` — keeps the `data/` directory tracked in the repo
+
+Workflow: Label videos → click Export → save as `data/private_seed.json` →
+on next fresh install the labels are re-imported automatically.
+
 Next session: Phase 3 (Feedback UI — `feedback-ui.js`, CSS buttons, `STORE_FEEDBACK`).
 
 *Add new entries at the bottom with today's date when starting a session.*
