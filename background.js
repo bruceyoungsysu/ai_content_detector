@@ -70,7 +70,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "OFFSCREEN_RESULT") {
-    const { videoId, score, logits, error } = message;
+    const { videoId, score, error } = message;
     const tabId = _pendingTabs.get(videoId);
     _pendingTabs.delete(videoId);
 
@@ -81,8 +81,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     }
 
-    const fmt = logits ? `[${logits.map(x => x.toFixed(2)).join(", ")}]` : "?";
-    console.log(`[AICD L2] ✓ ${videoId} logits=${fmt} score=${score?.toFixed(3)}`);
+    console.log(`[AICD L2] ✓ ${videoId} score=${score?.toFixed(3)}`);
     chrome.tabs.sendMessage(tabId, { type: "L2_RESULT", videoId, score })
       .catch(() => {});
     return false;

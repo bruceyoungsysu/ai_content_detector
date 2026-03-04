@@ -146,7 +146,7 @@ When enough labeled data exists (cross-user, opt-in):
 
 | # | Phase | Status | Key Deliverables |
 |---|---|---|---|
-| 1 | Remove broken model | `pending` | Delete EfficientNet-B0, ONNX Runtime; L2 returns neutral |
+| 1 | Remove broken model | `complete` | Delete EfficientNet-B0, ONNX Runtime; L2 returns neutral |
 | 2 | IndexedDB layer | `pending` | `db.js` with feedback + feat_cache stores |
 | 3 | Feedback UI | `pending` | `feedback-ui.js`, CSS buttons, `STORE_FEEDBACK` handler |
 | 4 | Channel reputation | `pending` | `layer3.js`, Beta-smoothed rep, `CHANNEL_REP_UPDATED` broadcast |
@@ -242,5 +242,27 @@ Treats each layer as an independent witness. Properties:
 - Scales naturally to N layers without reweighting
 
 ---
+
+### 2026-03-03
+
+**Phase 1 complete: removed EfficientNet-B0 and ONNX Runtime**
+
+EfficientNet-B0 (98.5% accuracy on its benchmark) was confirmed to completely
+fail on YouTube thumbnails — Rick Astley's 1987 music video scored 98.6% FAKE.
+Root cause: domain mismatch between training data (natural photos vs. AI art)
+and YouTube thumbnails (professionally edited, color-graded, text-overlaid).
+
+Changes made:
+- `offscreen.js` — gutted to a ~20-line stub that returns `score: 0` (neutral)
+  for all thumbnails. Canvas infrastructure will be rebuilt in Phase 5.
+- `offscreen.html` — removed `ort.min.js` script tag
+- `manifest.json` — removed `wasm-unsafe-eval` from CSP (no WASM needed)
+- `background.js` — removed debug logits logging
+- Deleted `export_model.py` and `setup_model.sh` (no longer needed)
+
+The extension now runs on L1 only. L2 contributes a neutral score (0) which
+has no effect on the Bayesian combination formula — correct cold-start behavior.
+
+Next session: Phase 2 (IndexedDB layer — `db.js`).
 
 *Add new entries at the bottom with today's date when starting a session.*
