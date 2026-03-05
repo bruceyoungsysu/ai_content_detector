@@ -82,6 +82,39 @@ async function ensureOffscreen() {
   console.log("[AICD] Offscreen document created");
 }
 
+// ---------------------------------------------------------------------------
+// Channel reputation — L3
+// ---------------------------------------------------------------------------
+
+async function updateChannelRep(channelId, userLabel) {
+  if (!channelId) return;
+
+  const data = await new Promise((resolve) =>
+    chrome.storage.local.get("channel_rep", resolve)
+  );
+  const rep   = data.channel_rep ?? {};
+  const entry = rep[channelId]   ?? { n_ai: 0, n_real: 0 };
+
+  if (userLabel === "ai")   entry.n_ai   += 1;
+  if (userLabel === "real") entry.n_real += 1;
+  entry.score     = (entry.n_ai + 1) / (entry.n_ai + entry.n_real + 2);
+  entry.updatedAt = Date.now();
+  rep[channelId]  = entry;
+
+  await new Promise((resolve) => chrome.storage.local.set({ channel_rep: rep }, resolve));
+
+  // Push the update to all open YouTube tabs so their L3 cache stays current.
+  chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
+    tabs.forEach((tab) => {
+      chrome.tabs.sendMessage(tab.id, {
+        type: "CHANNEL_REP_UPDATED",
+        channelId,
+        entry,
+      }).catch(() => {});
+    });
+  });
+}
+
 // Maps videoId → tabId of the content script that requested the analysis.
 const _pendingTabs = new Map();
 
@@ -111,6 +144,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       openDb()
         .then((db) => storeFeedback(db, entry))
         .catch(() => {});
+      updateChannelRep(entry.channelId, entry.userLabel);
     }
     return false;
   }

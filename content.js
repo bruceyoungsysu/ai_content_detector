@@ -1,5 +1,5 @@
 // Content script — orchestrates detection and badge rendering on YouTube.
-// layer1.js and layer2.js are loaded before this file (see manifest.json).
+// layer1.js, layer2.js, feedback-ui.js, and layer3.js are loaded before this file.
 
 let isEnabled = true;
 
@@ -32,14 +32,23 @@ async function processCard(el) {
 
   attachFeedbackWidget(el);                           // defined in feedback-ui.js
 
-  const videoId = getVideoId(el);                     // defined in layer1.js
-  console.log("[AICD] processCard videoId:", videoId, el.tagName);
+  const videoId   = getVideoId(el);                   // defined in layer1.js
+  const channelId = getChannelId(el);                 // defined in layer1.js
   if (!videoId) return;
+
+  // Apply L3 immediately (sync) — may already have channel signal.
+  const s3 = analyzeLayer3(channelId);                // defined in layer3.js
+  if (Math.abs(s3 - 0.5) >= 0.1) {
+    el.setAttribute("data-aicd", getBadgeState(1 - (1 - s1) * (1 - s3)));
+  }
 
   analyzeLayer2(videoId)                              // defined in layer2.js
     .then(s2 => {
       if (!isEnabled || !el.isConnected) return;
-      const combined = 1 - (1 - s1) * (1 - s2);      // Bayesian combination
+      const s3now = analyzeLayer3(channelId);         // re-read in case updated
+      const combined = Math.abs(s3now - 0.5) < 0.1
+        ? 1 - (1 - s1) * (1 - s2)                    // L3 neutral: L1 + L2 only
+        : 1 - (1 - s1) * (1 - s2) * (1 - s3now);    // full three-way combination
       el.setAttribute("data-aicd", getBadgeState(combined));
     })
     .catch(() => {});                                  // L2 failures are non-fatal
@@ -79,6 +88,7 @@ function startObserving() {
 window.addEventListener("yt-navigate-finish", async () => {
   invalidateMetaCache(); // defined in layer1.js
   await initLayer1();    // defined in layer1.js
+  await initLayer3();    // defined in layer3.js (reload storage in case labels changed)
   applyFilter();
 });
 
@@ -91,6 +101,11 @@ chrome.runtime.onMessage.addListener((message) => {
     isEnabled = message.enabled;
     applyFilter();
   }
+  // layer3.js updates its cache; re-score so other cards from this channel
+  // immediately reflect the new reputation.
+  if (message.type === "CHANNEL_REP_UPDATED") {
+    applyFilter();
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -101,6 +116,7 @@ chrome.runtime.sendMessage({ type: "GET_STATE" }, async (state) => {
   if (chrome.runtime.lastError) return;
   isEnabled = state?.enabled ?? true;
   await initLayer1(); // fetch ytInitialData via page bridge before first filter
+  await initLayer3(); // load channel reputation from storage
   applyFilter();
   startObserving();
 });
