@@ -141,6 +141,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "STORE_FEEDBACK") {
     const { entry } = message;
     if (entry?.videoId && entry?.userLabel) {
+      console.log(`[AICD] STORE_FEEDBACK ${entry.userLabel} videoId=${entry.videoId} channelId=${entry.channelId || "(empty)"}`);
       openDb()
         .then((db) => storeFeedback(db, entry))
         .catch(() => {});

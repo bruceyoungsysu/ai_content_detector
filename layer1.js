@@ -204,10 +204,13 @@ function buildMeta(renderer) {
  * Only populated on channel pages (/@handle/videos, /channel/UCxxx/...).
  */
 function extractPageChannelId(data) {
-  // Standard channel header (most YouTube versions)
-  const cid = data?.header?.c4TabbedHeaderRenderer?.channelId;
-  if (cid) return cid;
-  // Fallback: extract UCxxxx from the current page URL directly
+  // Older YouTube: header.c4TabbedHeaderRenderer.channelId
+  const fromHeader = data?.header?.c4TabbedHeaderRenderer?.channelId;
+  if (fromHeader) return fromHeader;
+  // Most YouTube versions: metadata.channelMetadataRenderer.externalId (reliable)
+  const fromMeta = data?.metadata?.channelMetadataRenderer?.externalId;
+  if (fromMeta) return fromMeta;
+  // URL fallback for /channel/UCxxx paths
   const m = window.location.pathname.match(/^\/channel\/(UC[\w-]+)/);
   return m?.[1] ?? null;
 }
