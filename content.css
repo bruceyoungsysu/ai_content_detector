@@ -8,7 +8,8 @@
 ytd-rich-item-renderer[data-aicd],
 ytd-video-renderer[data-aicd],
 ytd-compact-video-renderer[data-aicd],
-ytd-reel-item-renderer[data-aicd] {
+ytd-reel-item-renderer[data-aicd],
+ytd-grid-video-renderer[data-aicd] {
   position: relative !important;
 }
 
@@ -16,7 +17,8 @@ ytd-reel-item-renderer[data-aicd] {
 ytd-rich-item-renderer[data-aicd]::before,
 ytd-video-renderer[data-aicd]::before,
 ytd-compact-video-renderer[data-aicd]::before,
-ytd-reel-item-renderer[data-aicd]::before {
+ytd-reel-item-renderer[data-aicd]::before,
+ytd-grid-video-renderer[data-aicd]::before {
   position: absolute;
   top: 8px;
   left: 8px;
@@ -37,7 +39,8 @@ ytd-reel-item-renderer[data-aicd]::before {
 ytd-rich-item-renderer[data-aicd="safe"]::before,
 ytd-video-renderer[data-aicd="safe"]::before,
 ytd-compact-video-renderer[data-aicd="safe"]::before,
-ytd-reel-item-renderer[data-aicd="safe"]::before {
+ytd-reel-item-renderer[data-aicd="safe"]::before,
+ytd-grid-video-renderer[data-aicd="safe"]::before {
   content: "Not AI";
   background: #2e7d32;
 }
@@ -46,7 +49,8 @@ ytd-reel-item-renderer[data-aicd="safe"]::before {
 ytd-rich-item-renderer[data-aicd="possible"]::before,
 ytd-video-renderer[data-aicd="possible"]::before,
 ytd-compact-video-renderer[data-aicd="possible"]::before,
-ytd-reel-item-renderer[data-aicd="possible"]::before {
+ytd-reel-item-renderer[data-aicd="possible"]::before,
+ytd-grid-video-renderer[data-aicd="possible"]::before {
   content: "Possibly AI";
   background: #e65100;
 }
@@ -55,7 +59,8 @@ ytd-reel-item-renderer[data-aicd="possible"]::before {
 ytd-rich-item-renderer[data-aicd="ai"]::before,
 ytd-video-renderer[data-aicd="ai"]::before,
 ytd-compact-video-renderer[data-aicd="ai"]::before,
-ytd-reel-item-renderer[data-aicd="ai"]::before {
+ytd-reel-item-renderer[data-aicd="ai"]::before,
+ytd-grid-video-renderer[data-aicd="ai"]::before {
   content: "AI Detected";
   background: #c62828;
 }

@@ -84,9 +84,11 @@ function requestYtInitialData() {
 // ---------------------------------------------------------------------------
 
 let _metaCache = null;
+let _pageChannelId = null; // channel page fallback — all cards share one channel
 
 function invalidateMetaCache() {
   _metaCache = null;
+  _pageChannelId = null;
   _bridgeInjected = false;
 }
 
@@ -96,7 +98,12 @@ async function initLayer1() {
 
   // Index initial page data
   const data = await requestYtInitialData();
-  if (data) walkForVideos(data, _metaCache);
+  if (data) {
+    walkForVideos(data, _metaCache);
+    // Channel pages: extract page-level channelId from the header so cards
+    // that omit per-card channel info can still get a channelId.
+    if (!_pageChannelId) _pageChannelId = extractPageChannelId(data);
+  }
 
   // Index continuation data as the user scrolls or navigates
   window.addEventListener("message", (event) => {
@@ -172,20 +179,37 @@ function buildLockupMeta(renderer) {
   return { title, description: "", channel, channelId, badges: [], tags: [] };
 }
 
-/** Legacy videoRenderer */
+/** Legacy videoRenderer and gridVideoRenderer */
 function buildMeta(renderer) {
+  // gridVideoRenderer (channel pages) uses shortBylineText instead of ownerText
   const channelId =
     renderer.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId ??
     renderer.longBylineText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId ??
+    renderer.shortBylineText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId ??
     "";
+  const channel =
+    extractText(renderer.ownerText ?? renderer.longBylineText ?? renderer.shortBylineText) ?? "";
   return {
-    title:       extractText(renderer.title)                                ?? "",
-    description: extractText(renderer.descriptionSnippet)                   ?? "",
-    channel:     extractText(renderer.ownerText ?? renderer.longBylineText) ?? "",
+    title:       extractText(renderer.title)           ?? "",
+    description: extractText(renderer.descriptionSnippet) ?? "",
+    channel,
     channelId,
     badges:      extractBadgeLabels(renderer),
     tags:        Array.isArray(renderer.tags) ? renderer.tags : [],
   };
+}
+
+/**
+ * Extract the page-level channelId from ytInitialData.
+ * Only populated on channel pages (/@handle/videos, /channel/UCxxx/...).
+ */
+function extractPageChannelId(data) {
+  // Standard channel header (most YouTube versions)
+  const cid = data?.header?.c4TabbedHeaderRenderer?.channelId;
+  if (cid) return cid;
+  // Fallback: extract UCxxxx from the current page URL directly
+  const m = window.location.pathname.match(/^\/channel\/(UC[\w-]+)/);
+  return m?.[1] ?? null;
 }
 
 function extractText(obj) {
@@ -267,7 +291,8 @@ function getChannelId(cardEl) {
     const m = link.href.match(/\/channel\/(UC[\w-]+)/);
     if (m) return m[1];
   }
-  return "";
+  // Page-level fallback: on a channel's /videos page all cards share one channel.
+  return _pageChannelId ?? "";
 }
 
 function getChannelName(cardEl) {

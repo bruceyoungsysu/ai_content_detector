@@ -58,7 +58,7 @@ async function processCard(el) {
 function applyFilter() {
   document
     .querySelectorAll(
-      "ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-reel-item-renderer"
+      "ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-reel-item-renderer, ytd-grid-video-renderer"
     )
     .forEach(processCard);
 }
