@@ -165,11 +165,12 @@ function buildLockupMeta(renderer) {
       const text = part?.text?.content ?? part?.text?.simpleText ?? "";
       if (text) {
         channel = text;
-        // Try to find the browseId in commandRuns
+        // Find the channel browseId — YouTube channel IDs always start with "UC".
+        // Filter strictly to avoid picking up shared topic/playlist/music IDs.
         const runs = part?.text?.commandRuns ?? [];
         for (const run of runs) {
           const id = run?.onTap?.innertubeCommand?.browseEndpoint?.browseId;
-          if (id) { channelId = id; break; }
+          if (id?.startsWith("UC")) { channelId = id; break; }
         }
         break outer;
       }
@@ -201,9 +202,15 @@ function buildMeta(renderer) {
 
 /**
  * Extract the page-level channelId from ytInitialData.
- * Only populated on channel pages (/@handle/videos, /channel/UCxxx/...).
+ * Only populated on channel pages (/@handle/..., /channel/UCxxx/..., /c/..., /user/...).
+ * Returns null on home page, search, watch page, etc.
  */
 function extractPageChannelId(data) {
+  // Guard: only apply on actual channel pages.
+  const path = window.location.pathname;
+  const isChannelPage = /^\/(channel\/|c\/|user\/|@)/.test(path);
+  if (!isChannelPage) return null;
+
   // Older YouTube: header.c4TabbedHeaderRenderer.channelId
   const fromHeader = data?.header?.c4TabbedHeaderRenderer?.channelId;
   if (fromHeader) return fromHeader;
@@ -211,7 +218,7 @@ function extractPageChannelId(data) {
   const fromMeta = data?.metadata?.channelMetadataRenderer?.externalId;
   if (fromMeta) return fromMeta;
   // URL fallback for /channel/UCxxx paths
-  const m = window.location.pathname.match(/^\/channel\/(UC[\w-]+)/);
+  const m = path.match(/^\/channel\/(UC[\w-]+)/);
   return m?.[1] ?? null;
 }
 
@@ -285,14 +292,19 @@ function getChannelId(cardEl) {
     const cached = _metaCache?.get(videoId);
     if (cached?.channelId) return cached.channelId;
   }
-  // DOM fallback: find a /channel/UC... link inside the card.
+  // DOM fallback: find a channel link inside the card.
   const link =
     shadowQuery(cardEl, "a.yt-simple-endpoint[href*='/channel/']") ??
+    shadowQuery(cardEl, "a.yt-simple-endpoint[href*='/@']") ??
     shadowQuery(cardEl, "#channel-name a") ??
     shadowQuery(cardEl, "yt-formatted-string.ytd-channel-name a");
   if (link?.href) {
+    // /channel/UCxxxxxx format
     const m = link.href.match(/\/channel\/(UC[\w-]+)/);
     if (m) return m[1];
+    // /@handle format — use the handle as the key (consistent with buildLockupMeta miss)
+    const h = link.href.match(/\/@([\w.-]+)/);
+    if (h) return "@" + h[1];
   }
   // Page-level fallback: on a channel's /videos page all cards share one channel.
   return _pageChannelId ?? "";

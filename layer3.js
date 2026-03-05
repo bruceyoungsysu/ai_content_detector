@@ -27,14 +27,14 @@ function initLayer3() {
 
 /**
  * Return the reputation score for a channel.
- * Returns 0.5 (neutral) when channelId is unknown or has fewer than 2 labels
- * so that L3 does not pollute the combined score until there is real signal.
+ * Returns 0.5 (neutral) when channelId is unknown.
+ * Laplace smoothing naturally returns 0.5 at 0 labels, so no minimum-count
+ * guard is needed — one label is enough to move the score.
  */
 function analyzeLayer3(channelId) {
   if (!channelId) return 0.5;
   const rep = _repCache[channelId];
   if (!rep) return 0.5;
-  if (rep.n_ai + rep.n_real < 2) return 0.5;
   return (rep.n_ai + 1) / (rep.n_ai + rep.n_real + 2);
 }
 

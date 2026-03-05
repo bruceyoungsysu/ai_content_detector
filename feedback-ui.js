@@ -15,10 +15,9 @@ function attachFeedbackWidget(cardEl) {
   const videoId = getVideoId(cardEl); // defined in layer1.js
   if (!videoId) return;
 
-  // Capture metadata at attach time so click handlers don't need cardEl.
-  const channelId   = getChannelId(cardEl);   // defined in layer1.js
-  const channelName = getChannelName(cardEl); // defined in layer1.js
-  const title       = getCardTitle(cardEl);   // defined in layer1.js
+  // title is captured now; channelId/channelName are re-read at click time
+  // so we get the freshest cache state (metaCache may not be fully populated yet).
+  const title = getCardTitle(cardEl); // defined in layer1.js
 
   const widget = document.createElement("div");
   widget.className = "aicd-feedback";
@@ -43,13 +42,13 @@ function attachFeedbackWidget(cardEl) {
   btnAi.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    _toggle(widget, videoId, channelId, channelName, title, "ai");
+    _toggle(widget, videoId, getChannelId(cardEl), getChannelName(cardEl), title, "ai");
   });
 
   btnReal.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    _toggle(widget, videoId, channelId, channelName, title, "real");
+    _toggle(widget, videoId, getChannelId(cardEl), getChannelName(cardEl), title, "real");
   });
 }
 
@@ -74,16 +73,25 @@ function _toggle(widget, videoId, channelId, channelName, title, label) {
 }
 
 function _sendFeedback(videoId, channelId, channelName, title, userLabel) {
-  chrome.runtime.sendMessage({
-    type: "STORE_FEEDBACK",
-    entry: {
-      videoId,
-      channelId,
-      channelName,
-      title,
-      thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-      userLabel,
-      timestamp: Date.now(),
-    },
-  });
+  if (!chrome.runtime?.id) {
+    // Extension was reloaded while this tab was open — context is invalidated.
+    console.warn("[AICD] Extension context lost. Reload the page to re-enable labeling.");
+    return;
+  }
+  try {
+    chrome.runtime.sendMessage({
+      type: "STORE_FEEDBACK",
+      entry: {
+        videoId,
+        channelId,
+        channelName,
+        title,
+        thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+        userLabel,
+        timestamp: Date.now(),
+      },
+    });
+  } catch (e) {
+    console.warn("[AICD] sendMessage failed:", e.message);
+  }
 }

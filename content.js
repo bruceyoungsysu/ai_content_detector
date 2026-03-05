@@ -120,36 +120,40 @@ window.addEventListener("message", async (e) => {
   if (e.source !== window || e.data?.type !== "AICD_DIAG") return;
 
   const { videoId } = e.data;
-  const data = await new Promise((r) => chrome.storage.local.get("channel_rep", r));
-  const rep  = data.channel_rep ?? {};
 
+  // Print sync state first — no chrome API needed, works even after context loss.
   console.group("[AICD] Diagnostics");
-  console.log("pageChannelId :", _pageChannelId ?? "(none — channel page header not found)");
+  console.log("chrome.runtime:", chrome.runtime?.id ? "OK" : "INVALIDATED — reload the page!");
+  console.log("pageChannelId :", _pageChannelId ?? "(none)");
   console.log("metaCache size:", _metaCache?.size ?? 0);
-  console.log("channel_rep   :", Object.keys(rep).length, "channels");
 
+  // Show cache entries (no chrome API required).
   if (videoId) {
     const meta = _metaCache?.get(videoId);
     const cid  = meta?.channelId || _pageChannelId || "";
-    const s3   = analyzeLayer3(cid);
-    console.group(`Video: ${videoId}`);
-    console.log("title    :", meta?.title      ?? "(not in cache)");
-    console.log("channel  :", meta?.channel    ?? "(not in cache)");
-    console.log("channelId:", cid              || "(empty — L3 will be neutral)");
-    console.log("s3       :", s3.toFixed(3), Math.abs(s3 - 0.5) < 0.1 ? "→ neutral (< 0.1 from 0.5)" : "→ ACTIVE");
-    console.log("rep entry:", rep[cid]         ?? "(none in storage)");
-    console.groupEnd();
+    console.log("channelId     :", cid || "(empty — L3 neutral)");
+    console.log("channel       :", meta?.channel ?? "(not cached)");
+    console.log("title         :", meta?.title   ?? "(not cached)");
+    console.log("s3            :", analyzeLayer3(cid).toFixed(3));
   } else {
-    // Show all cached video entries (channelId column is most important)
     const rows = [...(_metaCache ?? [])].map(([vid, m]) => ({
-      videoId: vid,
-      channelId: m.channelId || "(empty)",
-      channel: m.channel,
-      title: m.title?.slice(0, 40),
+      videoId: vid, channelId: m.channelId || "(empty)", channel: m.channel,
     }));
-    console.table(rows);
-    console.table(rep);
+    if (rows.length) console.table(rows);
   }
+
+  // Async storage read — only if context is valid.
+  if (chrome.runtime?.id) {
+    try {
+      const data = await new Promise((r) => chrome.storage.local.get("channel_rep", r));
+      const rep  = data.channel_rep ?? {};
+      console.log("channel_rep   :", Object.keys(rep).length, "channels stored");
+      if (Object.keys(rep).length) console.table(rep);
+    } catch (err) {
+      console.warn("storage read failed:", err.message);
+    }
+  }
+
   console.groupEnd();
 });
 
