@@ -22,6 +22,11 @@ const _queue = [];
 // Number of requests currently in-flight
 let _active = 0;
 
+// videoIds whose in-flight request was started before the latest LR model
+// update — their result should be discarded and the request re-queued so
+// waiters get a score from the current model.
+const _staleInFlight = new Set();
+
 // ---------------------------------------------------------------------------
 // Internal: drain the queue up to MAX_CONCURRENT slots
 // ---------------------------------------------------------------------------
@@ -46,12 +51,33 @@ function _drainQueue() {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((message) => {
+  // New model trained — stale scores in cache are now wrong, clear them.
+  // In-flight requests are left to complete; content.js will re-score after
+  // applyFilter() is triggered by the same LR_MODEL_UPDATED broadcast.
+  if (message.type === "LR_MODEL_UPDATED") {
+    _l2Cache.clear();
+    // Mark every currently in-flight request as stale — it was dispatched
+    // before the new model was ready, so its score will be 0 (cold-start).
+    // When the result arrives we re-queue instead of resolving waiters with 0.
+    for (const videoId of _inFlight) _staleInFlight.add(videoId);
+    return;
+  }
+
   if (message.type !== "L2_RESULT") return;
 
   const { videoId, score } = message;
 
   _inFlight.delete(videoId);
   _active = Math.max(0, _active - 1);
+
+  // Result arrived from a pre-model request — discard score and re-queue so
+  // waiters receive a fresh prediction from the trained model.
+  if (_staleInFlight.has(videoId)) {
+    _staleInFlight.delete(videoId);
+    _queue.push(videoId);
+    _drainQueue();
+    return;
+  }
 
   if (score != null) _l2Cache.set(videoId, score);
 

@@ -8,6 +8,67 @@ const THRESHOLD_AI       = 0.6;
 const THRESHOLD_POSSIBLE = 0.3;
 
 // ---------------------------------------------------------------------------
+// L3-aware score combination
+// ---------------------------------------------------------------------------
+
+/**
+ * Combine a base score (L1 alone, or L1+L2) with the L3 channel reputation.
+ *
+ * L3 is asymmetric around 0.5:
+ *   s3 > 0.5  AI-leaning channel  → noisy-OR boost  (more AI evidence)
+ *   s3 < 0.5  Real-leaning channel → linear dampen  (scale base toward 0)
+ *   |s3-0.5| < 0.1  neutral          → no effect
+ *
+ * Dampening formula: base × (2 × s3)
+ *   s3=0.5 → ×1.0 (no change)   s3=0.25 → ×0.5   s3=0 → ×0 (zeroed out)
+ */
+function combineWithL3(base, s3) {
+  if (Math.abs(s3 - 0.5) < 0.1) return base;       // neutral dead zone
+  if (s3 > 0.5) return 1 - (1 - base) * (1 - s3); // AI-leaning: boost
+  return base * (2 * s3);                           // Real-leaning: dampen
+}
+
+// ---------------------------------------------------------------------------
+// Per-layer score display
+// ---------------------------------------------------------------------------
+
+/**
+ * Render (or update) the four-cell score strip at the bottom-left of a card.
+ * Pass null for s2 while the async L2 result is still pending.
+ * @param {Element} cardEl
+ * @param {number}       s1        L1 metadata score
+ * @param {number|null}  s2        L2 visual score (null = pending)
+ * @param {number}       s3        L3 channel score
+ * @param {number}       combined  final combined score
+ */
+function updateScoreDisplay(cardEl, s1, s2, s3, combined) {
+  let wrap = cardEl.querySelector(".aicd-scores");
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.className = "aicd-scores";
+    wrap.innerHTML =
+      '<span class="aicd-s1"></span>' +
+      '<span class="aicd-s2"></span>' +
+      '<span class="aicd-s3"></span>' +
+      '<span class="aicd-sc"></span>';
+    cardEl.appendChild(wrap);
+  }
+
+  const fmt = v => v === null ? "…" : v.toFixed(2);
+
+  wrap.querySelector(".aicd-s1").textContent = `metadata:${fmt(s1)}`;
+  wrap.querySelector(".aicd-s2").textContent = `thumbnail:${fmt(s2)}`;
+  wrap.querySelector(".aicd-s3").textContent = `channel:${fmt(s3)}`;
+
+  const scEl = wrap.querySelector(".aicd-sc");
+  scEl.textContent = `score:${fmt(combined)}`;
+  scEl.className = "aicd-sc"; // reset
+  if (combined >= THRESHOLD_AI)       scEl.classList.add("is-ai");
+  else if (combined >= THRESHOLD_POSSIBLE) scEl.classList.add("is-possible");
+  else                                     scEl.classList.add("is-safe");
+}
+
+// ---------------------------------------------------------------------------
 // Badge state
 // ---------------------------------------------------------------------------
 
@@ -37,19 +98,19 @@ async function processCard(el) {
   if (!videoId) return;
 
   // Apply L3 immediately (sync) — may already have channel signal.
-  const s3 = analyzeLayer3(channelId);                // defined in layer3.js
-  if (Math.abs(s3 - 0.5) >= 0.1) {
-    el.setAttribute("data-aicd", getBadgeState(1 - (1 - s1) * (1 - s3)));
-  }
+  const s3      = analyzeLayer3(channelId);           // defined in layer3.js
+  const earlyCombined = combineWithL3(s1, s3);
+  el.setAttribute("data-aicd", getBadgeState(earlyCombined));
+  updateScoreDisplay(el, s1, null, s3, earlyCombined); // L2 pending
 
   analyzeLayer2(videoId)                              // defined in layer2.js
     .then(s2 => {
       if (!isEnabled || !el.isConnected) return;
-      const s3now = analyzeLayer3(channelId);         // re-read in case updated
-      const combined = Math.abs(s3now - 0.5) < 0.1
-        ? 1 - (1 - s1) * (1 - s2)                    // L3 neutral: L1 + L2 only
-        : 1 - (1 - s1) * (1 - s2) * (1 - s3now);    // full three-way combination
+      const s3now    = analyzeLayer3(channelId);      // re-read in case updated
+      const base     = 1 - (1 - s1) * (1 - s2);     // L1 + L2 Bayesian
+      const combined = combineWithL3(base, s3now);
       el.setAttribute("data-aicd", getBadgeState(combined));
+      updateScoreDisplay(el, s1, s2, s3now, combined);
     })
     .catch(() => {});                                  // L2 failures are non-fatal
   // No await — applyFilter() stays fast; layer2 resolves independently
@@ -104,6 +165,11 @@ chrome.runtime.onMessage.addListener((message) => {
   // layer3.js updates its cache; re-score so other cards from this channel
   // immediately reflect the new reputation.
   if (message.type === "CHANNEL_REP_UPDATED") {
+    applyFilter();
+  }
+  // New LR model trained — layer2.js cleared its cache; re-score all cards
+  // so thumbnails get fresh L2 scores from the updated model.
+  if (message.type === "LR_MODEL_UPDATED") {
     applyFilter();
   }
 });

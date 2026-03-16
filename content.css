@@ -69,9 +69,9 @@ ytd-grid-video-renderer[data-aicd="ai"]::before {
 
 .aicd-feedback {
   position: absolute;
-  top: 8px;
+  bottom: 8px;
   right: 8px;
-  z-index: 9998;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -105,6 +105,51 @@ ytd-grid-video-renderer[data-aicd="ai"]::before {
 
 .aicd-fb-ai   { background: #c62828; color: #fff; }
 .aicd-fb-real { background: #2e7d32; color: #fff; }
+
+/* ── Per-layer score display ─────────────────────────────────────────────── */
+
+.aicd-scores {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 9998;
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+  pointer-events: none;
+  opacity: 0.25;
+  transition: opacity 0.2s;
+}
+
+/* Full opacity on card hover */
+ytd-rich-item-renderer:hover        .aicd-scores,
+ytd-video-renderer:hover            .aicd-scores,
+ytd-compact-video-renderer:hover    .aicd-scores,
+ytd-reel-item-renderer:hover        .aicd-scores,
+ytd-grid-video-renderer:hover       .aicd-scores { opacity: 1; }
+
+.aicd-scores span {
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-family: monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+/* Colour-code each factor */
+.aicd-s1 { border-top: 2px solid #1565c0; } /* blue   — metadata heuristics */
+.aicd-s2 { border-top: 2px solid #6a1b9a; } /* purple — thumbnail model     */
+.aicd-s3 { border-top: 2px solid #e65100; } /* amber  — channel reputation  */
+.aicd-sc { border-top: 2px solid #424242; } /* grey   — combined score      */
+
+/* Active indicator — combined score inherits badge colour */
+.aicd-sc.is-ai       { border-color: #c62828; }
+.aicd-sc.is-possible { border-color: #e65100; }
+.aicd-sc.is-safe     { border-color: #2e7d32; }
 
 /* Active label — highlight active button, fade the other */
 .aicd-feedback[data-labeled="ai"]   .aicd-fb-ai   { opacity: 1; box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0,0,0,0.5); }
